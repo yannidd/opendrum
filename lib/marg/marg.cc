@@ -147,16 +147,21 @@ void MARG::read_mag(float m[3], bool compensate) {
 
   join_xys_bytes(buffer, xyz);
 
-  m[0] = -xyz[1] * _mgauss_per_lsb * 0.1;
-  m[1] = xyz[0] * _mgauss_per_lsb * 0.1;
-  m[2] = xyz[2] * _mgauss_per_lsb * 0.1;
+  m[0] = -xyz[1] * _mgauss_per_lsb;
+  m[1] = xyz[0] * _mgauss_per_lsb;
+  m[2] = xyz[2] * _mgauss_per_lsb;
 
   if (compensate) {
     // TODO: Correct sensor bias and scale.
   }
 }
 
-void MARG::read_temp(float& t) {}
+void MARG::read_temp(float& t) {
+  byte buffer[2];
+  read_regs(slave::IMU, registers::TEMP_OUT_L, buffer, 2);
+
+  t = (buffer[0] | (buffer[1] << 8)) / 16.0;
+}
 
 void MARG::read(float a[3], float g[3], float m[3], float& t, bool compensate) {
   read_accel(a, compensate);

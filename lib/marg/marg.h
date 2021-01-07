@@ -88,8 +88,8 @@ class MARG {
   void setup_mag(mag_gain gain);
   void read_accel(float a[3], bool compensate = true);  // m/s^2
   void read_gyro(float g[3], bool compensate = true);   // rad/s
-  void read_mag(float m[3], bool compensate = true);    // uT
-  void read_temp(float& t);
+  void read_mag(float m[3], bool compensate = true);    // mGauss
+  void read_temp(float& t);                             // degree C
   void read(float a[3], float g[3], float m[3], float& t,
             bool compensate = true);
   void set_gyro_calib(float bias[3]);
