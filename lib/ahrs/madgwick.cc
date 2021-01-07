@@ -279,13 +279,18 @@ void Madgwick::computeAngles() {
   anglesComputed = 1;
 }
 
+/**
+ * Get the estimated orientation in quaternion.
+ *
+ * @return A column vector with quaternion values.
+ */
 BLA::Matrix<4> Madgwick::getQuaternion() {
   BLA::Matrix<4> result = {q0, q1, q2, q3};
   return result;
 }
 
 /**
- * Get the estimated Euler angles.
+ * Get the estimated orientation in Euler angles.
  *
  * @return A column vector with values for roll, pitch, and yaw in rad.
  */

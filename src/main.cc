@@ -159,11 +159,11 @@ void fusion_task() {
       int end = micros();
       tmp_counter++;
       if (tmp_counter % 10 == 0) {
-        Serial.print((int)filter.getYaw());
-        Serial.print(" ");
-        Serial.print((int)filter.getPitch());
-        Serial.print(" ");
-        Serial.println((int)filter.getRoll());
+        // Serial.print((int)filter.getYaw());
+        // Serial.print(" ");
+        // Serial.print((int)filter.getPitch());
+        // Serial.print(" ");
+        // Serial.println((int)filter.getRoll());
       }
       // Serial.println(end - start);
       start = end;
@@ -187,9 +187,14 @@ void ble_task() {
   while (true) {
     event_flags.wait_any(RUN_BLE_TASK_FLAG);
     MIDI.read();
-    if ((event_flags.get() & BLE_IS_CONNECTED_FLAG) && (millis() - t0) > 1000) {
-      t0 = millis();
-      MIDI.sendNoteOn(60, 100, 1);
+    // Check for a drum strike, non-blocking.
+    midiDataContainer *message_from_detection =
+        mail_from_detection_to_ble.try_get_for(0s);
+    if (message_from_detection != nullptr) {
+      byte note = message_from_detection->note;
+      byte velocity = message_from_detection->velocity;
+      mail_from_detection_to_ble.free(message_from_detection);
+      MIDI.sendNoteOn(note, velocity, 10);
     }
   }
 }
@@ -202,11 +207,15 @@ void ble_task() {
  * gyroscope readings, attitude and heading information.
  */
 void detection_task() {
+  DifferentiableValue g(T_SAMPLE / 1000.0);
+  unsigned long time_of_last_strike = 0;
+
   while (true) {
     // Wait for new sensor data...
     sensorDataContainer *message_from_sensor =
         mail_from_sensor_to_detection.try_get_for(FOREVER);
     if (message_from_sensor != nullptr) {
+      g.push(message_from_sensor->gyro(1));
       mail_from_sensor_to_detection.free(message_from_sensor);
     }
 
@@ -216,16 +225,33 @@ void detection_task() {
     if (message_from_fusion != nullptr) {
       mail_from_fusion_to_detection.free(message_from_fusion);
     }
+
+    unsigned long now = millis();
+    if ((g.x[0] > STRIKE_GYRO_THRESHOLD) &&
+        ((g.dx[1] >= 0 && g.dx[0] < 0) || (g.dx[1] > 0 && g.dx[0] <= 0)) &&
+        (g.ddx[0] < STRIKE_DDGYRO_THRESHOLD) &&
+        (now - time_of_last_strike > STRIKE_TIME_SEPARATION)) {
+      // Send a message to the ble task to request a sound play.
+      midiDataContainer *message_to_ble =
+          mail_from_detection_to_ble.try_alloc();
+      message_to_ble->note = 1;
+      message_to_ble->velocity =
+          27 + 100 * ((min(g.x[0], 34.9) - STRIKE_GYRO_THRESHOLD) /
+                      (34.9 - STRIKE_GYRO_THRESHOLD));
+      mail_from_detection_to_ble.put(message_to_ble);
+
+      time_of_last_strike = now;
+    }
   }
 }
 
 void setup() {
   // GPIO init.
   pinMode(LED_BUILTIN, OUTPUT);
-  
+
   // Serial init.
   Serial.begin(115200);
-  
+
   // BLE MIDI init.
   BLEMIDI.setHandleConnected(OnConnected);
   BLEMIDI.setHandleDisconnected(OnDisconnected);
