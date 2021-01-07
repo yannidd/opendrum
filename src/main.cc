@@ -20,7 +20,7 @@ using namespace std::chrono;
 
 // Config ----------------------------------------------------------------------
 const int T_SAMPLE = 2;  // ms
-const int FUSE_DECIMATE_FACTOR = 3;
+const int FUSE_DECIMATE_FACTOR = 2;
 
 // Misc ------------------------------------------------------------------------
 const chrono::hours FOREVER(numeric_limits<int>::max());
