@@ -11,6 +11,7 @@ MARG::MARG() { _wire = &Wire1; }
 
 bool MARG::begin() {
   _wire->begin();
+  _wire->setClock(400000);
 
   // Reset IMU & MAG.
   write_reg(slave::IMU, registers::CTRL_REG8, 0x05);
@@ -133,7 +134,9 @@ void MARG::read_gyro(float g[3], bool compensate) {
   g[2] = xyz[2] * _dps_per_lsb * 0.017453293;
 
   if (compensate) {
-    // TODO: Correct sensor bias and scale.
+    for (int i = 0; i < 3; i++) {
+      g[i] -= _g_bias[i];
+    }
   }
 }
 
@@ -174,6 +177,12 @@ int MARG::read_reg(uint8_t slave_address, uint8_t address) {
   }
 
   return _wire->read();
+}
+
+void MARG::set_gyro_calib(float bias[3]) {
+  for (int i = 0; i < 3; i++) {
+    _g_bias[i] = bias[i];
+  }
 }
 
 int MARG::read_regs(uint8_t slave_address, uint8_t address, uint8_t* data,

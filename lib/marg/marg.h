@@ -6,9 +6,15 @@
 class MARG {
  private:
   TwoWire* _wire;
+
+  // Scaling values for sensors. Converts to real units.
   float _g_per_lsb;
   float _dps_per_lsb;
   float _mgauss_per_lsb;
+
+  // Calibration values.
+  float _g_bias[3] = {0.0};
+
   int read_reg(uint8_t slave_address, uint8_t address);
   int read_regs(uint8_t slave_address, uint8_t address, uint8_t* data,
                 size_t length);
@@ -86,6 +92,7 @@ class MARG {
   void read_temp(float& t);
   void read(float a[3], float g[3], float m[3], float& t,
             bool compensate = true);
+  void set_gyro_calib(float bias[3]);
 };
 
 #endif  // OPENDRUM_MARG_H_

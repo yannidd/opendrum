@@ -14,6 +14,7 @@
 
 #include "ahrs.h"
 #include "config.h"
+#include "error.h"
 #include "marg.h"
 #include "types.h"
 
@@ -45,22 +46,16 @@ Mail<midiDataContainer, MAIL_SIZE> mail_from_detection_to_ble;
  */
 void sensor_task() {
   MARG marg;
+  float g_bias[3] = {0.061999, 0.090717, -0.037404};
+
+  if (!marg.begin()) error_blink(ERROR_SENSOR_INIT);
+  marg.set_gyro_calib(g_bias);
 
   mbed::Ticker timer;
   timer.attach([]() { event_flags.set(RUN_SENSOR_TASK_FLAG); },
                chrono::milliseconds(T_SAMPLE));
 
-  Serial.println("Starting IMU!");
-  if (!marg.begin()) {
-    Serial.println("Unable to initialize the LSM9DS1!");
-    while (1) {
-    };
-  }
-  Serial.println("Found LSM9DS1 9DOF");
-
-  Wire1.setClock(400000);
   BLA::Matrix<3> a, g, m;
-  BLA::Matrix<3> g_bias = {0.061999, -0.090717, -0.037404};
   float _a[3], _g[3], _m[3], _t;
 
   int start = micros();
@@ -75,8 +70,6 @@ void sensor_task() {
     a << _a[0], _a[1], _a[2];
     g << _g[0], _g[1], _g[2];
     m << _m[0], _m[1], _m[2];
-
-    g -= g_bias;
 
     // Trigger fusion task every N_TODO iterations.
     if (iteration_counter == FUSE_DECIMATE_FACTOR) {
