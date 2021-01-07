@@ -1,5 +1,5 @@
-#include <Adafruit_LSM9DS1.h>
-#include <Adafruit_Sensor.h>  // not used in this demo but required!
+// #include <Adafruit_LSM9DS1.h>
+// #include <Adafruit_Sensor.h>  // not used in this demo but required!
 #include <Arduino.h>
 #include <BLEMIDI_Transport.h>
 #include <BasicLinearAlgebra.h>
@@ -14,6 +14,7 @@
 
 #include "ahrs.h"
 #include "config.h"
+#include "marg.h"
 #include "types.h"
 
 using namespace rtos;
@@ -53,28 +54,24 @@ void OnDisconnected() {
  * constant frequency defined by F_SAMPLE Hz.
  */
 void sensor_task() {
-  Adafruit_LSM9DS1 imu = Adafruit_LSM9DS1(&Wire1);
+  MARG marg;
 
   mbed::Ticker timer;
   timer.attach([]() { event_flags.set(RUN_SENSOR_TASK_FLAG); },
                chrono::milliseconds(T_SAMPLE));
 
   Serial.println("Starting IMU!");
-  if (!imu.begin()) {
+  if (!marg.begin()) {
     Serial.println("Unable to initialize the LSM9DS1!");
     while (1) {
     };
   }
   Serial.println("Found LSM9DS1 9DOF");
 
-  imu.setupGyro(imu.LSM9DS1_GYROSCALE_2000DPS);
-  imu.setupAccel(imu.LSM9DS1_ACCELRANGE_16G);
-  imu.setupMag(imu.LSM9DS1_MAGGAIN_4GAUSS);
   Wire1.setClock(400000);
-  float a_scalar = SENSORS_GRAVITY_STANDARD * LSM9DS1_ACCEL_MG_LSB_16G / 1000;
-  float g_scalar = LSM9DS1_GYRO_DPS_DIGIT_2000DPS * SENSORS_DPS_TO_RADS;
   BLA::Matrix<3> a, g, m;
   BLA::Matrix<3> g_bias = {0.061999, -0.090717, -0.037404};
+  float _a[3], _g[3], _m[3], _t;
 
   int start = micros();
 
@@ -84,12 +81,10 @@ void sensor_task() {
 
     iteration_counter++;
 
-    imu.read();
-    a << imu.accelData.x * a_scalar, imu.accelData.y * a_scalar,
-        imu.accelData.z * a_scalar;
-    g << imu.gyroData.x * g_scalar, imu.gyroData.y * g_scalar,
-        imu.gyroData.z * g_scalar;
-    m << 0.0, 0.0, 0.0;
+    marg.read(_a, _g, _m, _t);
+    a << _a[0], _a[1], _a[2];
+    g << _g[0], _g[1], _g[2];
+    m << _m[0], _m[1], _m[2];
 
     g -= g_bias;
 
@@ -147,7 +142,7 @@ void fusion_task() {
       mail_from_sensor_to_fusion.free(message_from_sensor);
 
       // Fuse the sensor data to attitude and heading...
-      filter.update(g(0), -g(1), g(2), a(0), -a(1), a(2), 0.0, 0.0, 0.0);
+      filter.update(g(0), g(1), g(2), a(0), a(1), a(2), 0, 0, 0);
 
       // Send the attitude and heading to the detection task...
       BLA::Matrix<3> *message_to_detection =
@@ -159,11 +154,11 @@ void fusion_task() {
       int end = micros();
       tmp_counter++;
       if (tmp_counter % 10 == 0) {
-        // Serial.print((int)filter.getYaw());
-        // Serial.print(" ");
-        // Serial.print((int)filter.getPitch());
-        // Serial.print(" ");
-        // Serial.println((int)filter.getRoll());
+        Serial.print((int)filter.getYaw());
+        Serial.print(" ");
+        Serial.print((int)filter.getPitch());
+        Serial.print(" ");
+        Serial.println((int)filter.getRoll());
       }
       // Serial.println(end - start);
       start = end;
