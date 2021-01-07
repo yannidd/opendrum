@@ -1,5 +1,3 @@
-// #include <Adafruit_LSM9DS1.h>
-// #include <Adafruit_Sensor.h>  // not used in this demo but required!
 #include <Arduino.h>
 #include <BLEMIDI_Transport.h>
 #include <BasicLinearAlgebra.h>
