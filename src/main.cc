@@ -37,16 +37,6 @@ Mail<sensorDataContainer, MAIL_SIZE> mail_from_sensor_to_detection;
 Mail<BLA::Matrix<3>, MAIL_SIZE> mail_from_fusion_to_detection;
 Mail<midiDataContainer, MAIL_SIZE> mail_from_detection_to_ble;
 
-void OnConnected() {
-  digitalWrite(LED_BUILTIN, HIGH);
-  event_flags.set(BLE_IS_CONNECTED_FLAG);
-}
-
-void OnDisconnected() {
-  digitalWrite(LED_BUILTIN, LOW);
-  event_flags.clear(BLE_IS_CONNECTED_FLAG);
-}
-
 /**
  * Sensor task for real-time data acquisition.
  *
@@ -174,7 +164,6 @@ void fusion_task() {
  * note and velocity values, whenever a drumstrike has been detected.
  */
 void ble_task() {
-  unsigned long t0 = millis();
   mbed::Ticker timer;
   timer.attach([]() { event_flags.set(RUN_BLE_TASK_FLAG); },
                chrono::milliseconds(T_SAMPLE));
@@ -248,8 +237,14 @@ void setup() {
   Serial.begin(115200);
 
   // BLE MIDI init.
-  BLEMIDI.setHandleConnected(OnConnected);
-  BLEMIDI.setHandleDisconnected(OnDisconnected);
+  BLEMIDI.setHandleConnected([]() {
+    digitalWrite(LED_BUILTIN, HIGH);
+    event_flags.set(BLE_IS_CONNECTED_FLAG);
+  });
+  BLEMIDI.setHandleDisconnected([]() {
+    digitalWrite(LED_BUILTIN, LOW);
+    event_flags.clear(BLE_IS_CONNECTED_FLAG);
+  });
   MIDI.begin();
 
   // Thread definition.
