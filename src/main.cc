@@ -85,17 +85,21 @@ void sensor_task() {
 
       sensorDataContainer *message_to_fusion =
           mail_from_sensor_to_fusion.try_alloc();
-      copy(begin(a), end(a), begin(message_to_fusion->accel));
-      copy(begin(g), end(g), begin(message_to_fusion->gyro));
-      copy(begin(m), end(m), begin(message_to_fusion->mag));
-      mail_from_sensor_to_fusion.put(message_to_fusion);
+      if (message_to_fusion != nullptr) {
+        copy(begin(a), end(a), begin(message_to_fusion->accel));
+        copy(begin(g), end(g), begin(message_to_fusion->gyro));
+        copy(begin(m), end(m), begin(message_to_fusion->mag));
+        mail_from_sensor_to_fusion.put(message_to_fusion);
+      }
 
       sensorDataContainer *message_to_detection =
           mail_from_sensor_to_detection.try_alloc();
-      copy(begin(a), end(a), begin(message_to_detection->accel));
-      copy(begin(g), end(g), begin(message_to_detection->gyro));
-      copy(begin(m), end(m), begin(message_to_detection->mag));
-      mail_from_sensor_to_detection.put(message_to_detection);
+      if (message_to_detection != nullptr) {
+        copy(begin(a), end(a), begin(message_to_detection->accel));
+        copy(begin(g), end(g), begin(message_to_detection->gyro));
+        copy(begin(m), end(m), begin(message_to_detection->mag));
+        mail_from_sensor_to_detection.put(message_to_detection);
+      }
     }
 
     // Measure fps.
@@ -142,8 +146,10 @@ void fusion_task() {
       // Send the attitude and heading to the detection task...
       fusionDataContainer *message_to_detection =
           mail_from_fusion_to_detection.try_alloc();
-      copy(begin(euler), end(euler), begin(message_to_detection->euler));
-      mail_from_fusion_to_detection.put(message_to_detection);
+      if (message_to_detection != nullptr) {
+        copy(begin(euler), end(euler), begin(message_to_detection->euler));
+        mail_from_fusion_to_detection.put(message_to_detection);
+      }
 
       // Measure fps.
       int end = micros();
@@ -249,11 +255,13 @@ void detection_task() {
       // Send a message to the ble task to request a sound play.
       midiDataContainer *message_to_ble =
           mail_from_detection_to_ble.try_alloc();
-      message_to_ble->note = drums[drum_row][drum_col];
-      message_to_ble->velocity =
-          27 + 100 * ((min(g.x[0], 34.9) - STRIKE_GYRO_THRESHOLD) /
-                      (34.9 - STRIKE_GYRO_THRESHOLD));
-      mail_from_detection_to_ble.put(message_to_ble);
+      if (message_to_ble != nullptr) {
+        message_to_ble->note = drums[drum_row][drum_col];
+        message_to_ble->velocity =
+            27 + 100 * ((min(g.x[0], 34.9) - STRIKE_GYRO_THRESHOLD) /
+                        (34.9 - STRIKE_GYRO_THRESHOLD));
+        mail_from_detection_to_ble.put(message_to_ble);
+      }
 
       time_of_last_strike = now;
     }
