@@ -5,6 +5,9 @@
 
 using namespace std;
 
+const float RAD2DEG = 57.2958;
+const float DEGwRAD = 0.0174533;
+
 const chrono::hours FOREVER(numeric_limits<int>::max());
 
 typedef struct sensorDataContainer {

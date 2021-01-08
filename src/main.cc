@@ -23,6 +23,7 @@
 #include "config.h"
 #include "error.h"
 #include "marg.h"
+#include "misc.h"
 #include "types.h"
 
 using namespace rtos;
@@ -36,8 +37,12 @@ BLEMIDI_CREATE_INSTANCE("Drumless", MIDI);
 const int BLE_IS_CONNECTED_FLAG = (1UL << 0);
 const int RUN_SENSOR_TASK_FLAG = (1UL << 1);
 const int RUN_BLE_TASK_FLAG = (1UL << 2);
-const int RUN_FUSION_TASK_FLAG = (1UL << 3);
-EventFlags event_flags;
+const int RUN_BUTTON_TASK_FLAG = (1UL << 3);
+const int BUTTON_PRESSED_FLAG = (1UL << 4);
+const int BUTTON_DOUBLE_PRESSED_FLAG = (1UL << 5);
+const int BUTTON_TRIPLE_PRESSED_FLAG = (1UL << 6);
+const int BUTTON_LONG_PRESSED_FLAG = (1UL << 7);
+static EventFlags event_flags;
 
 // Mails for data passing between threads --------------------------------------
 Mail<sensorDataContainer, MAIL_SIZE> mail_from_sensor_to_fusion;
@@ -118,6 +123,7 @@ void fusion_task() {
   filter.begin(2000.0 / (T_SAMPLE * FUSE_DECIMATE_FACTOR));
   int start = micros();
   BLA::Matrix<3> a, g, m;
+  float euler[3], quat[4];
   int tmp_counter = 0;
 
   while (true) {
@@ -132,25 +138,32 @@ void fusion_task() {
 
       // Fuse the sensor data to attitude and heading...
       filter.update(g(0), g(1), g(2), a(0), a(1), a(2), 0, 0, 0);
+      filter.get_angles(euler);
 
       // Send the attitude and heading to the detection task...
       BLA::Matrix<3> *message_to_detection =
           mail_from_fusion_to_detection.try_alloc();
-      *message_to_detection = filter.getAngles();
+      // *message_to_detection = filter.getAngles();
       mail_from_fusion_to_detection.put(message_to_detection);
 
       // Measure fps.
       int end = micros();
       tmp_counter++;
       if (tmp_counter % 10 == 0) {
-        Serial.print((int)filter.getYaw());
+        Serial.print((int)euler[0]);
         Serial.print(" ");
-        Serial.print((int)filter.getPitch());
+        Serial.print((int)euler[1]);
         Serial.print(" ");
-        Serial.println((int)filter.getRoll());
+        Serial.println((int)euler[2]);
       }
       // Serial.println(end - start);
       start = end;
+    }
+
+    if (event_flags.get() & BUTTON_PRESSED_FLAG) {
+      filter.clear_reference();
+      filter.get_quaternion(quat);
+      filter.set_reference(quat);
     }
   }
 }
@@ -227,6 +240,28 @@ void detection_task() {
   }
 }
 
+void button_task() {
+  bool curr_state = false;
+  bool last_state = false;
+
+  mbed::Ticker timer;
+  timer.attach([]() { event_flags.set(RUN_BUTTON_TASK_FLAG); },
+               chrono::milliseconds(T_SAMPLE));
+
+  while (true) {
+    event_flags.wait_any(RUN_BUTTON_TASK_FLAG);
+    curr_state = !digitalRead(BUTTON_PIN);
+
+    if (curr_state == true) {
+      event_flags.set(BUTTON_PRESSED_FLAG);
+    } else {
+      event_flags.clear(BUTTON_PRESSED_FLAG);
+    }
+
+    last_state = curr_state;
+  }
+}
+
 void setup() {
   // GPIO init.
   pinMode(LED_BUILTIN, OUTPUT);
@@ -251,12 +286,14 @@ void setup() {
   Thread ble_thread(osPriorityRealtime);
   Thread fusion_thread(osPriorityRealtime);
   Thread detection_thread(osPriorityRealtime);
+  Thread button_thread(osPriorityRealtime);
 
   // Start threads.
   sensor_thread.start(mbed::callback(sensor_task));
   fusion_thread.start(mbed::callback(fusion_task));
   detection_thread.start(mbed::callback(detection_task));
   ble_thread.start(mbed::callback(ble_task));
+  button_thread.start(mbed::callback(button_task));
 
   // Put main thread to sleep.
   ThisThread::sleep_for(FOREVER);

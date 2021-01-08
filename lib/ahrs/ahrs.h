@@ -16,67 +16,63 @@
 //=============================================================================================
 #ifndef MadgwickAHRS_h
 #define MadgwickAHRS_h
-#include <BasicLinearAlgebra.h>
+
 #include <math.h>
 
-//--------------------------------------------------------------------------------------------
-// Variable declaration
+/**
+ * Compute 1 / sqrt(x) fast.
+ *
+ * Estimates ​the reciprocal of the square root of a 32-bit floating-point
+ * number. See http://en.wikipedia.org/wiki/Fast_inverse_square_root for more
+ * information.
+ *
+ * @param The input number.
+ * @return The reciprocal of the square root.
+ */
+float fast_inv_sqrt(float x);
+
+/**
+ * Compute the conjugate of a quaternion.
+ *
+ * @param q The input quaternion.
+ * @param q_conj The output quaternion.
+ */
+void quat_conj(float q[4], float q_conj[4]);
+
+/**
+ * Multiply two quaternions.
+ *
+ * @param q1 The first quaternion.
+ * @param q2 The second quaternion.
+ * @param q_res The resulting quaternion.
+ */
+void quat_mul(float q1[4], float q2[4], float q_res[4]);
+
 class Madgwick {
  private:
-  static float invSqrt(float x);
-  float beta;  // algorithm gain
-  float q0;
-  float q1;
-  float q2;
-  float q3;  // quaternion of sensor frame relative to auxiliary frame
-  float q_world[4]; // quaternion of sensor frame relative to world frame
-  float q_ref[4]; // a reference quaternion frame
-  float q_out[4]; // quaternion of sensor frame relative to reference frame
+  float _beta;               // algorithm gain
+  float _q0, _q1, _q2, _q3;  // quaternion from sensor frame to world frame
+  float _q_ref[4];           // a reference quaternion frame
+  float _q_out[4];           // quaternion from sensor frame to reference frame
+  float _roll;
+  float _pitch;
+  float _yaw;
   float invSampleFreq;
-  float roll;
-  float pitch;
-  float yaw;
-  char anglesComputed;
-  void computeAngles();
+  bool angles_computed;
+  void compute_angles();
 
-  //-------------------------------------------------------------------------------------------
-  // Function declarations
  public:
   Madgwick(void);
   void begin(float sampleFrequency) { invSampleFreq = 1.0f / sampleFrequency; }
   void update(float gx, float gy, float gz, float ax, float ay, float az,
               float mx, float my, float mz);
-  void updateIMU(float gx, float gy, float gz, float ax, float ay, float az);
-  BLA::Matrix<4> getQuaternion();
-  BLA::Matrix<3> getAngles();
-  float getRoll() {
-    if (!anglesComputed) computeAngles();
-    return roll * 57.29578f;
-  }
-  float getPitch() {
-    if (!anglesComputed) computeAngles();
-    return pitch * 57.29578f;
-  }
-  float getYaw() {
-    if (!anglesComputed) computeAngles();
-    return yaw * 57.29578f + 180.0f;
-  }
-  float getRollRadians() {
-    if (!anglesComputed) computeAngles();
-    return roll;
-  }
-  float getPitchRadians() {
-    if (!anglesComputed) computeAngles();
-    return pitch;
-  }
-  float getYawRadians() {
-    if (!anglesComputed) computeAngles();
-    return yaw;
-  }
+  void update_imu(float gx, float gy, float gz, float ax, float ay, float az);
+  void get_quaternion(float q[4]);
+  void get_angles(float a[3]);
+  void set_reference(float q[4]);
+  void get_reference(float q[4]);
+  void clear_reference();
 };
-
-//--------------------------------------------------------------------------------------------
-// Variable declaration
 
 class Mahony {
  private:
