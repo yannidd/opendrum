@@ -265,8 +265,8 @@ void Madgwick::compute_angles() {
   float q3 = _q_out[3];
 
   _roll = RAD2DEG * atan2f(q0 * q1 + q2 * q3, 0.5f - q1 * q1 - q2 * q2);
-  _pitch = RAD2DEG * asinf(-2.0f * (q1 * q3 - q0 * q2));
-  _yaw = RAD2DEG * atan2f(q1 * q2 + q0 * q3, 0.5f - q2 * q2 - q3 * q3);
+  _pitch = -RAD2DEG * asinf(-2.0f * (q1 * q3 - q0 * q2));
+  _yaw = -RAD2DEG * atan2f(q1 * q2 + q0 * q3, 0.5f - q2 * q2 - q3 * q3);
 
   angles_computed = true;
 }

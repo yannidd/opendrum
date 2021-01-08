@@ -1,7 +1,7 @@
 #ifndef OPENDRUM_TYPES_H_
 #define OPENDRUM_TYPES_H_
 
-#include <BasicLinearAlgebra.h>
+#include <Arduino.h>
 
 using namespace std;
 
@@ -11,10 +11,14 @@ const float DEGwRAD = 0.0174533;
 const chrono::hours FOREVER(numeric_limits<int>::max());
 
 typedef struct sensorDataContainer {
-  BLA::Matrix<3> accel;
-  BLA::Matrix<3> gyro;
-  BLA::Matrix<3> mag;
+  float accel[3];
+  float gyro[3];
+  float mag[3];
 } sensorDataContainer;
+
+typedef struct fusionDataContainer {
+  float euler[3];
+} fusionDataContainer;
 
 typedef struct midiDataContainer {
   byte note;

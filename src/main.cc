@@ -47,7 +47,7 @@ static EventFlags event_flags;
 // Mails for data passing between threads --------------------------------------
 Mail<sensorDataContainer, MAIL_SIZE> mail_from_sensor_to_fusion;
 Mail<sensorDataContainer, MAIL_SIZE> mail_from_sensor_to_detection;
-Mail<BLA::Matrix<3>, MAIL_SIZE> mail_from_fusion_to_detection;
+Mail<fusionDataContainer, MAIL_SIZE> mail_from_fusion_to_detection;
 Mail<midiDataContainer, MAIL_SIZE> mail_from_detection_to_ble;
 
 /**
@@ -67,8 +67,7 @@ void sensor_task() {
   timer.attach([]() { event_flags.set(RUN_SENSOR_TASK_FLAG); },
                chrono::milliseconds(T_SAMPLE));
 
-  BLA::Matrix<3> a, g, m;
-  float _a[3], _g[3], _m[3], _t;
+  float a[3], g[3], m[3], t;
 
   int start = micros();
 
@@ -78,10 +77,7 @@ void sensor_task() {
 
     iteration_counter++;
 
-    marg.read(_a, _g, _m, _t);
-    a << _a[0], _a[1], _a[2];
-    g << _g[0], _g[1], _g[2];
-    m << _m[0], _m[1], _m[2];
+    marg.read(a, g, m, t);
 
     // Trigger fusion task every N_TODO iterations.
     if (iteration_counter == FUSE_DECIMATE_FACTOR) {
@@ -89,16 +85,16 @@ void sensor_task() {
 
       sensorDataContainer *message_to_fusion =
           mail_from_sensor_to_fusion.try_alloc();
-      message_to_fusion->accel = a;
-      message_to_fusion->gyro = g;
-      message_to_fusion->mag = m;
+      copy(begin(a), end(a), begin(message_to_fusion->accel));
+      copy(begin(g), end(g), begin(message_to_fusion->gyro));
+      copy(begin(m), end(m), begin(message_to_fusion->mag));
       mail_from_sensor_to_fusion.put(message_to_fusion);
 
       sensorDataContainer *message_to_detection =
           mail_from_sensor_to_detection.try_alloc();
-      message_to_detection->accel = a;
-      message_to_detection->gyro = g;
-      message_to_detection->mag = m;
+      copy(begin(a), end(a), begin(message_to_detection->accel));
+      copy(begin(g), end(g), begin(message_to_detection->gyro));
+      copy(begin(m), end(m), begin(message_to_detection->mag));
       mail_from_sensor_to_detection.put(message_to_detection);
     }
 
@@ -122,7 +118,7 @@ void fusion_task() {
   // TODO: Investigate why the frequency needs to be multiplied by 2.
   filter.begin(2000.0 / (T_SAMPLE * FUSE_DECIMATE_FACTOR));
   int start = micros();
-  BLA::Matrix<3> a, g, m;
+  float a[3], g[3], m[3];
   float euler[3], quat[4];
   int tmp_counter = 0;
 
@@ -131,19 +127,22 @@ void fusion_task() {
     sensorDataContainer *message_from_sensor =
         mail_from_sensor_to_fusion.try_get_for(FOREVER);
     if (message_from_sensor != nullptr) {
-      a = message_from_sensor->accel;
-      g = message_from_sensor->gyro;
-      m = message_from_sensor->mag;
+      copy(begin(message_from_sensor->accel), end(message_from_sensor->accel),
+           begin(a));
+      copy(begin(message_from_sensor->gyro), end(message_from_sensor->gyro),
+           begin(g));
+      copy(begin(message_from_sensor->mag), end(message_from_sensor->mag),
+           begin(m));
       mail_from_sensor_to_fusion.free(message_from_sensor);
 
       // Fuse the sensor data to attitude and heading...
-      filter.update(g(0), g(1), g(2), a(0), a(1), a(2), 0, 0, 0);
+      filter.update(g[0], g[1], g[2], a[0], a[1], a[2], 0, 0, 0);
       filter.get_angles(euler);
 
       // Send the attitude and heading to the detection task...
-      BLA::Matrix<3> *message_to_detection =
+      fusionDataContainer *message_to_detection =
           mail_from_fusion_to_detection.try_alloc();
-      // *message_to_detection = filter.getAngles();
+      copy(begin(euler), end(euler), begin(message_to_detection->euler));
       mail_from_fusion_to_detection.put(message_to_detection);
 
       // Measure fps.
@@ -204,20 +203,26 @@ void ble_task() {
 void detection_task() {
   DifferentiableValue g(T_SAMPLE / 1000.0);
   unsigned long time_of_last_strike = 0;
+  float euler[3];
+  byte drums[2][3] = {
+      {DRUM_TOP_LEFT, DRUM_TOP_MIDDLE, DRUM_TOP_RIGHT},
+      {DRUM_BOTTOM_LEFT, DRUM_BOTTOM_MIDDLE, DRUM_BOTTOM_RIGHT}};
 
   while (true) {
     // Wait for new sensor data...
     sensorDataContainer *message_from_sensor =
         mail_from_sensor_to_detection.try_get_for(FOREVER);
     if (message_from_sensor != nullptr) {
-      g.push(message_from_sensor->gyro(1));
+      g.push(message_from_sensor->gyro[1]);
       mail_from_sensor_to_detection.free(message_from_sensor);
     }
 
     // Check for new AHRS data, non-blocking...
-    BLA::Matrix<3> *message_from_fusion =
+    fusionDataContainer *message_from_fusion =
         mail_from_fusion_to_detection.try_get_for(0s);
     if (message_from_fusion != nullptr) {
+      copy(begin(message_from_fusion->euler), end(message_from_fusion->euler),
+           begin(euler));
       mail_from_fusion_to_detection.free(message_from_fusion);
     }
 
@@ -226,10 +231,25 @@ void detection_task() {
         ((g.dx[1] >= 0 && g.dx[0] < 0) || (g.dx[1] > 0 && g.dx[0] <= 0)) &&
         (g.ddx[0] < STRIKE_DDGYRO_THRESHOLD) &&
         (now - time_of_last_strike > STRIKE_TIME_SEPARATION)) {
+      // Detect which drum was struck.
+      int drum_row = 0, drum_col = 0;
+
+      if (euler[1] > BOUNDARY_HORIZONTAL)  // UP
+        drum_row = 0;
+      else  // DOWN
+        drum_row = 1;
+
+      if (euler[2] < BOUNDARY_VERTICAL_LEFT)  // LEFT
+        drum_col = 0;
+      else if (euler[2] > BOUNDARY_VERTICAL_RIGHT)  // RIGHT
+        drum_col = 2;
+      else  // MIDDLE
+        drum_col = 1;
+
       // Send a message to the ble task to request a sound play.
       midiDataContainer *message_to_ble =
           mail_from_detection_to_ble.try_alloc();
-      message_to_ble->note = 1;
+      message_to_ble->note = drums[drum_row][drum_col];
       message_to_ble->velocity =
           27 + 100 * ((min(g.x[0], 34.9) - STRIKE_GYRO_THRESHOLD) /
                       (34.9 - STRIKE_GYRO_THRESHOLD));
