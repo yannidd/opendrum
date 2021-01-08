@@ -29,6 +29,9 @@ class Madgwick {
   float q1;
   float q2;
   float q3;  // quaternion of sensor frame relative to auxiliary frame
+  float q_world[4]; // quaternion of sensor frame relative to world frame
+  float q_ref[4]; // a reference quaternion frame
+  float q_out[4]; // quaternion of sensor frame relative to reference frame
   float invSampleFreq;
   float roll;
   float pitch;

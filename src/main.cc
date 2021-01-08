@@ -1,3 +1,12 @@
+/**
+ * Source code for OpenDrum.
+ *
+ * The program is separated into tasks which run in separate threads. Tasks are
+ * defined in <task name>_task() functions. Communication between tasks is done
+ * via queues named mail_from_<task 1>_to_<task 2> and event flags named
+ * <NAME>_FLAG.
+ */
+
 #include <Arduino.h>
 #include <BLEMIDI_Transport.h>
 #include <BasicLinearAlgebra.h>
@@ -99,8 +108,7 @@ void sensor_task() {
  * Fusion task for AHRS.
  *
  * The fusion task is responsible for fusing the accelerometer, gyroscope and
- * magnetometer readings into attitude and heading information. It is called
- at
+ * magnetometer readings into attitude and heading information. It is called at
  * a constant frequency of F_SAMPLE/FUSE_DECIMATION_FACTOR Hz.
  */
 void fusion_task() {
@@ -150,8 +158,7 @@ void fusion_task() {
 /**
  * Task for sending BLE MIDI messages.
  *
- * This task is responsible for sending BLE MIDI messages with the
- appropriate
+ * This task is responsible for sending BLE MIDI messages with the appropriate
  * note and velocity values, whenever a drumstrike has been detected.
  */
 void ble_task() {
@@ -223,6 +230,7 @@ void detection_task() {
 void setup() {
   // GPIO init.
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 
   // Serial init.
   Serial.begin(115200);
