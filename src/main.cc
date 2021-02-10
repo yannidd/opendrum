@@ -9,9 +9,7 @@
 
 #include <Arduino.h>
 #include <BLEMIDI_Transport.h>
-#include <BasicLinearAlgebra.h>
 #include <Duration.h>
-#include <MatrixMath.h>
 #include <Wire.h>
 #include <hardware/BLEMIDI_ArduinoBLE.h>
 #include <mbed.h>
