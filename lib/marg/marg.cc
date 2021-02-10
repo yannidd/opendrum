@@ -219,3 +219,23 @@ int MARG::write_reg(uint8_t slave_address, uint8_t address, uint8_t value) {
 
   return 1;
 }
+
+void MARG::estimate_gyro_bias() {
+  Serial.println("Estimating gyroscope bias...");
+  delay(2000);
+
+  float gyro_bias[3];
+  float gyro[3];
+
+  for (int i = 0; i < 5000; i++) {
+    read_gyro(gyro, false);
+    for (int j = 0; j < 3; j++)
+      gyro_bias[j] = gyro_bias[j] + (gyro[j] - gyro_bias[j]) / (i + 1);
+    delay(1);
+  }
+
+  Serial.printf("float g_bias[3] = {%f, %f, %f};\n", gyro_bias[0], gyro_bias[1],
+                gyro_bias[2]);
+  Serial.println("Estimating gyroscope bias done!");
+  delay(2000);
+}

@@ -56,9 +56,10 @@ Mail<midiDataContainer, MAIL_SIZE> mail_from_detection_to_ble;
  */
 void sensor_task() {
   MARG marg;
-  float g_bias[3] = {0.061999, 0.090717, -0.037404};
 
   if (!marg.begin()) error_blink(ERROR_SENSOR_INIT);
+  // marg.estimate_gyro_bias();
+  float g_bias[3] = {0.061999, 0.090717, -0.037404};
   marg.set_gyro_calib(g_bias);
 
   mbed::Ticker timer;
@@ -66,8 +67,6 @@ void sensor_task() {
                chrono::milliseconds(T_SAMPLE));
 
   float a[3], g[3], m[3], t;
-
-  int start = micros();
 
   int iteration_counter = 0;
   while (true) {
@@ -99,11 +98,6 @@ void sensor_task() {
         mail_from_sensor_to_detection.put(message_to_detection);
       }
     }
-
-    // Measure fps.
-    int end = micros();
-    // Serial.println(end - start);
-    start = end;
   }
 }
 
@@ -119,7 +113,6 @@ void fusion_task() {
   Madgwick filter;
   // TODO: Investigate why the frequency needs to be multiplied by 2.
   filter.begin(2000.0 / (T_SAMPLE * FUSE_DECIMATE_FACTOR));
-  int start = micros();
   float a[3], g[3], m[3];
   float euler[3], quat[4];
   int tmp_counter = 0;
@@ -149,8 +142,6 @@ void fusion_task() {
         mail_from_fusion_to_detection.put(message_to_detection);
       }
 
-      // Measure fps.
-      int end = micros();
       tmp_counter++;
       if (tmp_counter % 10 == 0) {
         Serial.print((int)euler[0]);
@@ -159,8 +150,6 @@ void fusion_task() {
         Serial.print(" ");
         Serial.println((int)euler[2]);
       }
-      // Serial.println(end - start);
-      start = end;
     }
 
     if (event_flags.get() & BUTTON_PRESSED_FLAG) {

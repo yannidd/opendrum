@@ -93,6 +93,7 @@ class MARG {
   void read(float a[3], float g[3], float m[3], float& t,
             bool compensate = true);
   void set_gyro_calib(float bias[3]);
+  void estimate_gyro_bias();
 };
 
 #endif  // OPENDRUM_MARG_H_
